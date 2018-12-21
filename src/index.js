@@ -1,28 +1,12 @@
 import extend from 'extend'
-import CryptoJS from 'crypto-js'
 import {getOptions} from 'loader-utils'
 import {Encrypt as Base64} from './base64'
 import {Encrypt as AES} from './aes'
+import UglifyJS from 'uglify-js'
 
 const encrypts = {
 	'base64': Base64,
 	'aes': AES
-}
-
-function EncryptBase64(content, options) {
-	const str = CryptoJS.enc.Utf8.parse(content);
-	const base64 = CryptoJS.enc.Base64.stringify(str);
-
-	if(!options.decode) return `'${base64}'`
-
-	// 加密后解密
-	let res = `(function() {
-		var CryptoJS = require('crypto-js');
-		var content = CryptoJS.enc.Base64.parse('${base64}').toString(CryptoJS.enc.Utf8);
-		return new Function('return '+ content)();
-	})()`
-
-	return res
 }
 
 function encrypt(content, options) {
@@ -35,6 +19,13 @@ function encrypt(content, options) {
 		fn = encrypts[options.transform]
 	}
 
+	if(options.minify) {
+		try {
+			let {code} = UglifyJS.minify(options.minifyPrefix + content, options.uglifyOptions);
+			content = code.substr(options.minifyPrefix.length)
+		}catch(err) {}
+	}
+
 	if(fn) {
 		try {
 			res = fn.call(this, content, options)
@@ -43,7 +34,7 @@ function encrypt(content, options) {
 		}
 	}
 
-	return (options.mode=='file' ? 'module.exports=' : '') + res
+	return res
 }
 
 module.exports = function(source) {
@@ -52,22 +43,29 @@ module.exports = function(source) {
 			mode: 'block',
 			tag: 'encrypt',
 			decode: true,
-			transform: 'base64'
+			transform: 'base64',
+			minify: true,
+			minifyPrefix: 'module.exports=',
+			uglifyOptions: {
+				output: {
+					beautify: false,
+					comments: false,
+					ascii_only: true
+				}
+			}
+
 		}, getOptions(self));
+
+	// options.uglifyOptions.output.comments = new RegExp(`<\\/?${options.tag}>`)
 
 	if (self.cacheable) self.cacheable();
 
-	let content = source
-
 	if(options.mode=='file') {
-		content = encrypt.call(self, content, options)
+		source = encrypt.call(self, source, options)
 	}else{
 		let tagReg = new RegExp(`(?:/\\*\\s*<${options.tag}>\\s*\\*/|//\\s*<${options.tag}>)([\\s\\S]*?)(?:/\\*\\s*</${options.tag}>\\s*\\*/|//\\s*</${options.tag}>)`, 'g')
-		content = content.replace(tagReg, function(m, cont) {
-			let res = encrypt.call(self, cont, options)
-			return res
-		})
+		source = source.replace(tagReg, (m, cont) => encrypt.call(self, cont, options))
 	}
 
-	return content;
+	return (options.mode == 'file' ? 'module.exports = ' : '') + source;
 };

@@ -100,12 +100,126 @@ module.exports=(function() {
 })()
 ```
 
+## 注意事项
+配合babel-loader使用时，若encrypt-loader在babel-loader后调用，必须在末尾加上`;`分号。请看下例：
+
+rules配置为
+```javascript
+{
+	test: /\.js$/,
+	use: [
+		'encrypt-loader'  // 再转码
+		'babel-loader?cacheDirectory',  // 先babel转换
+	]
+}
+```
+test.js
+```javascript
+const APIS = /*<encrypt>*/{
+	info       : 'GET:/common/info',
+	menu       : 'GET:/common/menu',
+	test : {
+		user   : 'GET:/user/info'
+	}
+}/*</encrypt>*/
+```
+babel编译后会变成
+```javascript
+var APIS = /*<encrypt>*/{
+	info: 'GET:/common/info',
+	menu: 'GET:/common/menu',
+	test: {
+		user: 'GET:/user/info'
+	} /*</encrypt>*/
+};
+```
+> 注释标签错乱了...这就会导致转码后webpack报错，因为转码后会留下一个}，语法错误了~~~
+
+**在末尾加个分号**
+test.js
+```javascript
+const APIS = /*<encrypt>*/{
+	info       : 'GET:/common/info',
+	menu       : 'GET:/common/menu',
+	test : {
+		user   : 'GET:/user/info'
+	}
+};/*</encrypt>*/
+// 上面这行末尾多了个分号
+```
+babel编译后，一切就恢复正常了~
+```javascript
+var APIS = /*<encrypt>*/{
+	info: 'GET:/common/info',
+	menu: 'GET:/common/menu',
+	test: {
+		user: 'GET:/user/info'
+	}
+}; /*</encrypt>*/
+```
+
+**所以** ，建议在babel-loader前转码，源码中不使用ES6语法~
+
+### 压缩
+现只会压缩需要转码的部分，大部分情况下，转码部分都会是`值`，但是Uglify-js不能压缩纯值，因此会加上`module.exports=`前缀后再进行压缩，若压缩失败，请检查下前缀加上后的语法是否正确。
+
+流程如下：
+```javascript
+const test = /*<encrypt>*/[
+	// test
+	"test",
+	"abc"
+];/*</encrypt>*/
+```
+
+转码部分识别为
+```javascript
+[
+	// test
+	"test",
+	"abc"
+];
+```
+
+压缩前转换为
+```javascript
+module.exports=[
+	// test
+	"test",
+	"abc"
+];
+```
+
+调用压缩
+```javascript
+UglifyJS.minify(`module.exports=[
+	// test
+	"test",
+	"abc"
+];`, options.uglifyOptions)
+```
+
+截取压缩后的代码，最终为
+```javascript
+["test","abc"];
+```
+
+
 ## 选项
 ```javascript
 {
 	mode: 'block', // 模式：支持block分块转码，file整个文件转码
 	tag: 'encrypt', // 标签：mode==block时，识别转码块标识。示例：<encrypt>code</encrypt>
 	decode: true, // 解码：iife返回解码值，设置为false，则直接返回转码后的值
-	transform: 'base64' // 转码方法(string|fn)：内置支持base64、aes，可设置自定义方法fn(content, options)
+	transform: 'base64', // 转码方法(string|fn)：内置支持base64、aes，可设置自定义方法fn(content, options)
+	minify: true, // 启用压缩，uglify-js
+	minifyPrefix: 'module.exports=', // 压缩部分将加上`module.exports=`前缀后再压缩（不要带空格，否则压缩后空格丢失，将截取错误）
+	uglifyOptions: { // 压缩选项
+		output: {
+			beautify: false,
+			comments: false,
+			ascii_only: true
+		}
+	}
 }
 ```

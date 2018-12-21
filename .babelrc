@@ -1,12 +1,12 @@
 {
 	"presets": [
-		["env", {
+		["@babel/preset-env", {
 			"targets": {
 				"browsers": ["> 5%", "last 3 versions", "ie >= 9"]
 			}
 		}]
 	],
 	"plugins": [
-		"transform-runtime"
+		"@babel/plugin-transform-runtime"
 	]
 }
