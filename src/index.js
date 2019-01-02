@@ -23,7 +23,9 @@ function encrypt(content, options) {
 		try {
 			let {code} = UglifyJS.minify(options.minifyPrefix + content, options.uglifyOptions);
 			content = code.substr(options.minifyPrefix.length)
-		}catch(err) {}
+		}catch(err) {
+			process.stdout.write(`encrypt-loader minify fail: ${this.resourcePath}\n`)
+		}
 	}
 
 	if(fn) {
