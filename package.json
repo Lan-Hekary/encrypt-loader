@@ -1,6 +1,6 @@
 {
   "name": "encrypt-loader",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "mudoo <mudoo@qq.com>",
   "description": "encrypt loader module for webpack",
   "main": "lib/index.js",
@@ -24,6 +24,8 @@
   },
   "dependencies": {
     "crypto-js": "^3.1.9-1",
+    "extend": "^3.0.2",
+    "loader-utils": "^2.0.0",
     "uglify-js": "^3.4.9"
   },
   "devDependencies": {
